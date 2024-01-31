@@ -1,25 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 import MoviesList from './components/MoviesList';
 import './App.css';
 
 function App() {
   const [movies, setMovies] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
 
-  useEffect(() => {
-    if (retryCount > 0) {
-      const timerId = setTimeout(() => {
-        fetchMoviesHandler();
-      }, 5000);
-
-      return () => clearTimeout(timerId);
-    }
-  }, [retryCount]);
-
-  async function fetchMoviesHandler() {
+  const fetchMoviesHandler = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
@@ -31,14 +21,13 @@ function App() {
 
       const data = await response.json();
 
-      const transformedMovies = data.results.map((movieData) => {
-        return {
-          id: movieData.episode_id,
-          title: movieData.title,
-          openingText: movieData.opening_crawl,
-          releaseDate: movieData.release_date,
-        };
-      });
+      const transformedMovies = data.results.map((movieData) => ({
+        id: movieData.episode_id,
+        title: movieData.title,
+        openingText: movieData.opening_crawl,
+        releaseDate: movieData.release_date,
+      }));
+
       setMovies(transformedMovies);
       setIsLoading(false);
     } catch (error) {
@@ -46,18 +35,38 @@ function App() {
       setRetryCount((prevRetryCount) => prevRetryCount + 1);
       setIsLoading(false);
     }
-  }
+  }, [setIsLoading, setError, setMovies, setRetryCount]);
 
-  function cancelRetryHandler() {
+  const cancelRetryHandler = useCallback(() => {
     setRetryCount(0);
     setError(null);
-  }
+  }, [setRetryCount, setError]);
+
+  useEffect(() => {
+    fetchMoviesHandler();
+  }, [fetchMoviesHandler]);
+
+  useEffect(() => {
+    if (retryCount > 0) {
+      const timerId = setTimeout(() => {
+        fetchMoviesHandler();
+      }, 5000);
+
+      return () => clearTimeout(timerId);
+    }
+  }, [retryCount, fetchMoviesHandler]);
 
   return (
     <React.Fragment>
       <section>
-        <button onClick={fetchMoviesHandler}>Fetch Movies</button>
-        {retryCount > 0 && <button onClick={cancelRetryHandler}>Cancel Retry</button>}
+        <button onClick={fetchMoviesHandler} disabled={isLoading}>
+          Fetch Movies
+        </button>
+        {retryCount > 0 && (
+          <button onClick={cancelRetryHandler} disabled={isLoading}>
+            Cancel Retry
+          </button>
+        )}
       </section>
       <section>
         {!isLoading && movies.length > 0 && <MoviesList movies={movies} />}
